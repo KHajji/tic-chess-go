@@ -62,8 +62,8 @@ class Piece(Enum):
 
 # move notation:
 # Place pawn on x,y -> xy
-# Move piece from x,y to x,y -> xy-xy
-# Promote pawn to piece at x,y -> xy-xyK, xy-xyR, xy-xyB
+# Move piece from x,y to nx,ny -> xy-nxny
+# Promote pawn to piece at nx,ny -> xy-nxnyK, xy-nxnyR, xy-nxnyB
 
 
 class Board:
@@ -114,6 +114,10 @@ class Board:
                     self.pawn_movements(allowed_moves, x, y)
                 if piece in [Piece.WHITE_KNIGHT, Piece.BLACK_KNIGHT]:
                     self.knight_movements(allowed_moves, x, y)
+                if piece in [Piece.WHITE_BISHOP, Piece.BLACK_BISHOP]:
+                    self.bischop_movement(allowed_moves, x, y)
+                if piece in [Piece.WHITE_ROOK, Piece.BLACK_ROOK]:
+                    self.rook_movement(allowed_moves, x, y)
 
         return allowed_moves
 
@@ -137,7 +141,6 @@ class Board:
                     allowed_moves.append(pawn_movement)
 
     def knight_movements(self, allowed_moves, x, y):
-        # knight move diff coordinates:
         diffs = [(1,2), (2,1), (-1,2), (-2,1), (1,-2), (2,-1), (-1,-2), (-2,-1)]
         for dx, dy in diffs:
             nx, ny = x + dx, y + dy
@@ -149,6 +152,38 @@ class Board:
                 )
                 if is_empty or is_opposite_color:
                     allowed_moves.append(f"{x}{y}-{nx}{ny}")
+                    
+    def bischop_movement(self, allowed_moves, x, y):
+        diffs = [(1,1), (-1,1), (1,-1), (-1,-1)]
+        for dx, dy in diffs:
+            nx, ny = x + dx, y + dy
+            while nx >= 0 and nx < self.max_x and ny >= 0 and ny < self.max_y:
+                target_piece = self.board[ny][nx]
+                is_empty = target_piece == Piece.EMPTY
+                is_opposite_color = (target_piece.is_white() and not self.turn) or (
+                    target_piece.is_black() and self.turn
+                )
+                if is_empty or is_opposite_color:
+                    allowed_moves.append(f"{x}{y}-{nx}{ny}")
+                if not is_empty:
+                    break
+                nx, ny = nx + dx, ny + dy
+                
+    def rook_movement(self, allowed_moves, x, y):
+        diffs = [(1,0), (0,1), (-1,0), (0,-1)]
+        for dx, dy in diffs:
+            nx, ny = x + dx, y + dy
+            while nx >= 0 and nx < self.max_x and ny >= 0 and ny < self.max_y:
+                target_piece = self.board[ny][nx]
+                is_empty = target_piece == Piece.EMPTY
+                is_opposite_color = (target_piece.is_white() and not self.turn) or (
+                    target_piece.is_black() and self.turn
+                )
+                if is_empty or is_opposite_color:
+                    allowed_moves.append(f"{x}{y}-{nx}{ny}")
+                if not is_empty:
+                    break
+                nx, ny = nx + dx, ny + dy
 
     def promote(self, move: str) -> list[str]:
         allowed_moves: list[str] = [move]
