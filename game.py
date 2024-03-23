@@ -112,6 +112,8 @@ class Board:
 
                 if piece in [Piece.WHITE_PAWN, Piece.BLACK_PAWN]:
                     self.pawn_movements(allowed_moves, x, y)
+                if piece in [Piece.WHITE_KNIGHT, Piece.BLACK_KNIGHT]:
+                    self.knight_movements(allowed_moves, x, y)
 
         return allowed_moves
 
@@ -133,6 +135,20 @@ class Board:
                     allowed_moves.extend(self.promote(pawn_movement))
                 else:
                     allowed_moves.append(pawn_movement)
+
+    def knight_movements(self, allowed_moves, x, y):
+        # knight move diff coordinates:
+        diffs = [(1,2), (2,1), (-1,2), (-2,1), (1,-2), (2,-1), (-1,-2), (-2,-1)]
+        for dx, dy in diffs:
+            nx, ny = x + dx, y + dy
+            if nx >= 0 and nx < self.max_x and ny >= 0 and ny < self.max_y:
+                target_piece = self.board[ny][nx]
+                is_empty = target_piece == Piece.EMPTY
+                is_opposite_color = (target_piece.is_white() and not self.turn) or (
+                    target_piece.is_black() and self.turn
+                )
+                if is_empty or is_opposite_color:
+                    allowed_moves.append(f"{x}{y}-{nx}{ny}")
 
     def promote(self, move: str) -> list[str]:
         allowed_moves: list[str] = [move]
