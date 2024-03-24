@@ -138,6 +138,18 @@ class Move:
     def __repr__(self):
         return self.to_string()
 
+    def __eq__(self, other):
+        if isinstance(other, Move):
+            return (
+                self.start_x == other.start_x
+                and self.start_y == other.start_y
+                and self.piece == other.piece
+                and self.end_x == other.end_x
+                and self.end_y == other.end_y
+                and self.promotion == other.promotion
+            )
+        return False
+
 
 class Board:
     max_x = 3
@@ -150,13 +162,14 @@ class Board:
             [Piece.EMPTY for x in range(self.max_x)] for y in range(self.max_y)
         ]
 
-    def print_board(self):
-        print(
+    def __repr__(self):
+        return (
             f"  a b c\n"
             f"3 {self.board[0][0].unicode_character()} {self.board[0][1].unicode_character()} {self.board[0][2].unicode_character()} 3\n"
             f"2 {self.board[1][0].unicode_character()} {self.board[1][1].unicode_character()} {self.board[1][2].unicode_character()} 2\n"
             f"1 {self.board[2][0].unicode_character()} {self.board[2][1].unicode_character()} {self.board[2][2].unicode_character()} 1\n"
             f"  a b c\n"
+            f"{'White' if self.turn else 'Black'} to move"
         )
 
     def allowed_moves(self) -> list[Move]:
@@ -270,28 +283,44 @@ class Board:
     def promote(self, move: Move) -> list[Move]:
         allowed_moves: list[Move] = [move]
         # You can only promote to a piece if it is not already on the board
-        piece_flags = {
-            "R": Piece.WHITE_ROOK,
-            "K": Piece.WHITE_KNIGHT,
-            "B": Piece.WHITE_BISHOP,
-        }
+        pieces = [
+            Piece.WHITE_ROOK,
+            Piece.WHITE_KNIGHT,
+            Piece.WHITE_BISHOP,
+        ]
         if not self.turn:
-            piece_flags = {
-                "R": Piece.BLACK_ROOK,
-                "K": Piece.BLACK_KNIGHT,
-                "B": Piece.BLACK_BISHOP,
-            }
+            pieces = [
+                Piece.BLACK_ROOK,
+                Piece.BLACK_KNIGHT,
+                Piece.BLACK_BISHOP,
+            ]
 
-        for piece, piece_type in piece_flags.items():
-            if not any(piece_type in row for row in self.board):
+        for piece in pieces:
+            if not any(piece in row for row in self.board):
                 allowed_moves.append(
-                    Move(move.start_x, move.start_y, piece_type, move.end_x, move.end_y)
+                    Move(
+                        move.start_x, move.start_y, piece, move.end_x, move.end_y, piece
+                    )
                 )
-
         return allowed_moves
 
+    def execute_move(self, move: Move) -> None:
+        # Check if the move is valid
+        if move not in self.allowed_moves():
+            print(f"Invalid move {move}")
+            return
+        # Execute placement moves
+        if move.end_x is None or move.end_y is None:
+            self.board[move.start_y][move.start_x] = move.piece
+            self.turn = not self.turn
+            return
+        # Execute movement moves
+        self.board[move.end_y][move.end_x] = move.piece
+        self.board[move.start_y][move.start_x] = Piece.EMPTY
+        self.turn = not self.turn
 
-if __name__ == "__main__":
+
+def main():
     board = Board()
     board.board[0][0] = Piece.BLACK_PAWN
     board.board[0][1] = Piece.BLACK_ROOK
@@ -299,5 +328,10 @@ if __name__ == "__main__":
     board.board[1][0] = Piece.WHITE_PAWN
     board.board[1][1] = Piece.WHITE_ROOK
     board.board[2][2] = Piece.WHITE_KNIGHT
-    board.print_board()
+    print(board)
     print(board.allowed_moves())
+    return board
+
+
+if __name__ == "__main__":
+    main()
