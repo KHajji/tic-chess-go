@@ -1,4 +1,4 @@
-import array
+import os
 from enum import Enum
 
 
@@ -151,7 +151,7 @@ class Move:
         return False
 
 
-class Board:
+class Game:
     max_x = 3
     max_y = 3
     board: list[list[Piece]]
@@ -163,7 +163,7 @@ class Board:
         ]
 
     def __repr__(self):
-        return (
+        s = (
             f"  a b c\n"
             f"3 {self.board[0][0].unicode_character()} {self.board[0][1].unicode_character()} {self.board[0][2].unicode_character()} 3\n"
             f"2 {self.board[1][0].unicode_character()} {self.board[1][1].unicode_character()} {self.board[1][2].unicode_character()} 2\n"
@@ -171,6 +171,10 @@ class Board:
             f"  a b c\n"
             f"{'White' if self.turn else 'Black'} to move"
         )
+        if self.in_check():
+            s += "\nYou are in check!"
+            
+        return s
 
     def allowed_moves(self) -> list[Move]:
         allowed_moves: list[Move] = []
@@ -188,7 +192,8 @@ class Board:
             if (y != 0 and self.turn) or (y != 2 and not self.turn)
         ]
         for x, y in empty_spots_on_your_side:
-            allowed_moves.append(Move(start_x=x, start_y=y, piece=Piece.WHITE_PAWN))
+            pawn_piece = Piece.WHITE_PAWN if self.turn else Piece.BLACK_PAWN
+            allowed_moves.append(Move(start_x=x, start_y=y, piece=pawn_piece))
 
         # Piece movement
         for x in range(self.max_x):
@@ -208,6 +213,12 @@ class Board:
                 if piece in [Piece.WHITE_ROOK, Piece.BLACK_ROOK]:
                     self.rook_movement(allowed_moves, x, y)
 
+        # Filter out moves that would put you in check
+        allowed_moves = [
+            move
+            for move in allowed_moves
+            if not self.would_put_in_check(move)
+        ]
         return allowed_moves
 
     def pawn_movements(self, allowed_moves: list[Move], x: int, y: int) -> None:
@@ -304,11 +315,7 @@ class Board:
                 )
         return allowed_moves
 
-    def execute_move(self, move: Move) -> None:
-        # Check if the move is valid
-        if move not in self.allowed_moves():
-            print(f"Invalid move {move}")
-            return
+    def execute_move(self, move: Move) -> None:        
         # Execute placement moves
         if move.end_x is None or move.end_y is None:
             self.board[move.start_y][move.start_x] = move.piece
@@ -318,20 +325,74 @@ class Board:
         self.board[move.end_y][move.end_x] = move.piece
         self.board[move.start_y][move.start_x] = Piece.EMPTY
         self.turn = not self.turn
-
+    
+    def would_put_in_check(self, move: Move) -> bool:
+        # Simulate the move
+        old_board = [row.copy() for row in self.board]
+        old_turn = self.turn
+        self.execute_move(move)
+        # Check if the move would put you in check and revert turn
+        self.turn = not self.turn
+        in_check = self.in_check()
+        # Revert the move
+        self.board = old_board
+        self.turn = old_turn
+        return in_check
+    
+    def in_check(self) -> bool:
+        # You are in check if the opponent has three pieces in a row
+        def piece_of_opponent(piece: Piece) -> bool:
+            return (piece.is_white() and not self.turn) or (
+                piece.is_black() and self.turn
+            )
+        
+        # check rows
+        for row in self.board:
+            if all(piece_of_opponent(piece) for piece in row):
+                return True
+        # check columns
+        for c in range(3):
+            column = [self.board[0][c], self.board[1][c], self.board[2][c]]
+            if all(piece_of_opponent(piece) for piece in column):
+                return True
+        # check diagonals
+        if all(piece_of_opponent(self.board[i][i]) for i in range(3)):
+            return True
+        if all(piece_of_opponent(self.board[i][2-i]) for i in range(3)):
+            return True
+        
+        return False
+    
+    def check_mate(self) -> bool:
+        return self.in_check() and not self.allowed_moves()
+    
+    def stalemate(self) -> bool:
+        return not self.in_check() and not self.allowed_moves()
 
 def main():
-    board = Board()
-    board.board[0][0] = Piece.BLACK_PAWN
-    board.board[0][1] = Piece.BLACK_ROOK
-    board.board[0][2] = Piece.BLACK_KNIGHT
-    board.board[1][0] = Piece.WHITE_PAWN
-    board.board[1][1] = Piece.WHITE_ROOK
-    board.board[2][2] = Piece.WHITE_KNIGHT
-    print(board)
-    print(board.allowed_moves())
-    return board
-
+    game = Game()  # Assuming Game is your main class
+    while True:
+        os.system("clear")
+        print(game)  # Print the current state of the board
+        allowed_moves = game.allowed_moves()
+        if not allowed_moves:
+            if game.check_mate():
+                winner = "White" if game.turn else "Black"
+                print(f"Checkmate, {winner} wins!")
+            elif game.stalemate():
+                print("Stalemate!")
+            break
+        print("Allowed moves:")
+        for i, move in enumerate(allowed_moves):
+            print(f"{i}: {move}")
+        try:
+            move_index = int(input("Enter the index of your move: "))
+            if 0 <= move_index < len(allowed_moves):
+                game.execute_move(allowed_moves[move_index])
+            else:
+                print("Invalid move index. Please try again.")
+        except ValueError:
+            print("Invalid input. Please enter an integer.")
 
 if __name__ == "__main__":
     main()
