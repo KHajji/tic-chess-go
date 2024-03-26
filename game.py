@@ -1,5 +1,6 @@
 import os
 from enum import Enum
+import re
 
 
 class Piece(Enum):
@@ -91,45 +92,24 @@ class Move:
         self.promotion = promotion
 
     def to_string(self) -> str:
-        s = ""
-        match self.start_x:
-            case 0:
-                s += "a"
-            case 1:
-                s += "b"
-            case 2:
-                s += "c"
-        match self.start_y:
-            case 0:
-                s += "3"
-            case 1:
-                s += "2"
-            case 2:
-                s += "1"
-        match self.end_x:
-            case None:
-                return s
-            case 0:
-                s += "-a"
-            case 1:
-                s += "-b"
-            case 2:
-                s += "-c"
-        match self.end_y:
-            case 0:
-                s += "3"
-            case 1:
-                s += "2"
-            case 2:
-                s += "1"
+        x_mapping = {0: "a", 1: "b", 2: "c"}
+        y_mapping = {0: "3", 1: "2", 2: "1"}
+        promotion_mapping = {
+            Piece.WHITE_ROOK: "R",
+            Piece.WHITE_KNIGHT: "K",
+            Piece.WHITE_BISHOP: "B",
+            Piece.BLACK_ROOK: "R",
+            Piece.BLACK_KNIGHT: "K",
+            Piece.BLACK_BISHOP: "B",
+        }
+
+        s = x_mapping.get(self.start_x, "") + y_mapping.get(self.start_y, "")
+        if self.end_x is not None and self.end_y is not None:
+            s += "-" + x_mapping.get(self.end_x, "") + y_mapping.get(self.end_y, "")
 
         if self.promotion:
-            if self.promotion.is_rook():
-                s += "R"
-            elif self.promotion.is_knight():
-                s += "K"
-            elif self.promotion.is_bishop():
-                s += "B"
+            s += promotion_mapping.get(self.promotion, "")
+
         return s
 
     def __str__(self):
@@ -173,56 +153,46 @@ class Game:
         )
         if self.in_check():
             s += "\nYou are in check!"
-            
+
         return s
 
     def allowed_moves(self) -> list[Move]:
         allowed_moves: list[Move] = []
 
-        # Pawn placements
-        empty_spots = [
-            (x, y)
-            for x in range(self.max_x)
-            for y in range(self.max_y)
-            if self.board[y][x] == Piece.EMPTY
-        ]
-        empty_spots_on_your_side = [
-            (x, y)
-            for x, y in empty_spots
-            if (y != 0 and self.turn) or (y != 2 and not self.turn)
-        ]
-        for x, y in empty_spots_on_your_side:
-            pawn_piece = Piece.WHITE_PAWN if self.turn else Piece.BLACK_PAWN
-            allowed_moves.append(Move(start_x=x, start_y=y, piece=pawn_piece))
-
         # Piece movement
         for x in range(self.max_x):
-            for y in range(self.max_y):
+            for y in reversed(range(self.max_y)):
                 piece = self.board[y][x]
                 if piece.is_black() and self.turn:
                     continue
                 if piece.is_white() and not self.turn:
                     continue
 
+                if piece == Piece.EMPTY and (
+                    (y != 0 and self.turn) or (y != 2 and not self.turn)
+                ):  # Pawn placements
+                    placement_pawn = Piece.WHITE_PAWN if self.turn else Piece.BLACK_PAWN
+                    allowed_moves.append(
+                        Move(start_x=x, start_y=y, piece=placement_pawn)
+                    )
+
                 if piece in [Piece.WHITE_PAWN, Piece.BLACK_PAWN]:
-                    self.pawn_movements(allowed_moves, x, y)
+                    allowed_moves.extend(self.pawn_movements(x, y))
                 if piece in [Piece.WHITE_KNIGHT, Piece.BLACK_KNIGHT]:
-                    self.knight_movements(allowed_moves, x, y)
+                    allowed_moves.extend(self.knight_movements(x, y))
                 if piece in [Piece.WHITE_BISHOP, Piece.BLACK_BISHOP]:
-                    self.bischop_movement(allowed_moves, x, y)
+                    allowed_moves.extend(self.bischop_movement(x, y))
                 if piece in [Piece.WHITE_ROOK, Piece.BLACK_ROOK]:
-                    self.rook_movement(allowed_moves, x, y)
+                    allowed_moves.extend(self.rook_movement(x, y))
 
         # Filter out moves that would put you in check
         allowed_moves = [
-            move
-            for move in allowed_moves
-            if not self.would_put_in_check(move)
+            move for move in allowed_moves if not self.would_put_in_check(move)
         ]
         return allowed_moves
 
-    def pawn_movements(self, allowed_moves: list[Move], x: int, y: int) -> None:
-
+    def pawn_movements(self, x: int, y: int) -> list[Move]:
+        allowed_moves: list[Move] = []
         directions = [0, 1, -1]
         for dx in directions:
             dy = -1 if self.turn else 1
@@ -245,8 +215,10 @@ class Game:
                     allowed_moves.extend(self.promote(pawn_movement))
                 else:
                     allowed_moves.append(pawn_movement)
+        return allowed_moves
 
-    def knight_movements(self, allowed_moves: list[Move], x: int, y: int) -> None:
+    def knight_movements(self, x: int, y: int) -> list[Move]:
+        allowed_moves: list[Move] = []
         diffs = [(1, 2), (2, 1), (-1, 2), (-2, 1), (1, -2), (2, -1), (-1, -2), (-2, -1)]
         for dx, dy in diffs:
             nx, ny = x + dx, y + dy
@@ -258,8 +230,10 @@ class Game:
                 )
                 if is_empty or is_opposite_color:
                     allowed_moves.append(Move(x, y, self.board[y][x], nx, ny))
+        return allowed_moves
 
-    def bischop_movement(self, allowed_moves: list[Move], x: int, y: int) -> None:
+    def bischop_movement(self, x: int, y: int) -> list[Move]:
+        allowed_moves: list[Move] = []
         diffs = [(1, 1), (-1, 1), (1, -1), (-1, -1)]
         for dx, dy in diffs:
             nx, ny = x + dx, y + dy
@@ -274,8 +248,10 @@ class Game:
                 if not is_empty:
                     break
                 nx, ny = nx + dx, ny + dy
+        return allowed_moves
 
-    def rook_movement(self, allowed_moves: list[Move], x: int, y: int) -> None:
+    def rook_movement(self, x: int, y: int) -> list[Move]:
+        allowed_moves: list[Move] = []
         diffs = [(1, 0), (0, 1), (-1, 0), (0, -1)]
         for dx, dy in diffs:
             nx, ny = x + dx, y + dy
@@ -290,6 +266,7 @@ class Game:
                 if not is_empty:
                     break
                 nx, ny = nx + dx, ny + dy
+        return allowed_moves
 
     def promote(self, move: Move) -> list[Move]:
         allowed_moves: list[Move] = [move]
@@ -315,7 +292,7 @@ class Game:
                 )
         return allowed_moves
 
-    def execute_move(self, move: Move) -> None:        
+    def execute_move(self, move: Move) -> None:
         # Execute placement moves
         if move.end_x is None or move.end_y is None:
             self.board[move.start_y][move.start_x] = move.piece
@@ -325,7 +302,7 @@ class Game:
         self.board[move.end_y][move.end_x] = move.piece
         self.board[move.start_y][move.start_x] = Piece.EMPTY
         self.turn = not self.turn
-    
+
     def would_put_in_check(self, move: Move) -> bool:
         # Simulate the move
         old_board = [row.copy() for row in self.board]
@@ -338,18 +315,19 @@ class Game:
         self.board = old_board
         self.turn = old_turn
         return in_check
-    
+
     def in_check(self) -> bool:
         # You are in check if the opponent has three pieces in a row
         def piece_of_opponent(piece: Piece) -> bool:
             return (piece.is_white() and not self.turn) or (
                 piece.is_black() and self.turn
             )
-        
+
         # check rows
         for row in self.board:
             if all(piece_of_opponent(piece) for piece in row):
                 return True
+
         # check columns
         for c in range(3):
             column = [self.board[0][c], self.board[1][c], self.board[2][c]]
@@ -358,16 +336,17 @@ class Game:
         # check diagonals
         if all(piece_of_opponent(self.board[i][i]) for i in range(3)):
             return True
-        if all(piece_of_opponent(self.board[i][2-i]) for i in range(3)):
+        if all(piece_of_opponent(self.board[i][2 - i]) for i in range(3)):
             return True
-        
+
         return False
-    
+
     def check_mate(self) -> bool:
         return self.in_check() and not self.allowed_moves()
-    
+
     def stalemate(self) -> bool:
         return not self.in_check() and not self.allowed_moves()
+
 
 def main():
     game = Game()  # Assuming Game is your main class
@@ -377,7 +356,7 @@ def main():
         allowed_moves = game.allowed_moves()
         if not allowed_moves:
             if game.check_mate():
-                winner = "White" if game.turn else "Black"
+                winner = "Black" if game.turn else "White"
                 print(f"Checkmate, {winner} wins!")
             elif game.stalemate():
                 print("Stalemate!")
@@ -393,6 +372,7 @@ def main():
                 print("Invalid move index. Please try again.")
         except ValueError:
             print("Invalid input. Please enter an integer.")
+
 
 if __name__ == "__main__":
     main()
