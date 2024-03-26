@@ -1,6 +1,6 @@
+from operator import is_
 import os
 from enum import Enum
-import re
 
 
 class Piece(Enum):
@@ -15,56 +15,28 @@ class Piece(Enum):
     BLACK_BISHOP = 8
 
     def unicode_character(self):
-        match self:
-            case Piece.EMPTY:
-                return " "
-            case Piece.WHITE_PAWN:
-                return "♙"
-            case Piece.WHITE_ROOK:
-                return "♖"
-            case Piece.WHITE_KNIGHT:
-                return "♘"
-            case Piece.WHITE_BISHOP:
-                return "♗"
-            case Piece.BLACK_PAWN:
-                return "♟"
-            case Piece.BLACK_ROOK:
-                return "♜"
-            case Piece.BLACK_KNIGHT:
-                return "♞"
-            case Piece.BLACK_BISHOP:
-                return "♝"
+        return " ♙♖♘♗♟♜♞♝"[self.value]
 
     def is_white(self):
-        return self in [
-            Piece.WHITE_PAWN,
-            Piece.WHITE_ROOK,
-            Piece.WHITE_KNIGHT,
-            Piece.WHITE_BISHOP,
-        ]
+        return 1 <= self.value <= 4
 
     def is_black(self):
-        return self in [
-            Piece.BLACK_PAWN,
-            Piece.BLACK_ROOK,
-            Piece.BLACK_KNIGHT,
-            Piece.BLACK_BISHOP,
-        ]
+        return 5 <= self.value <= 8
 
     def is_empty(self):
         return self == Piece.EMPTY
 
     def is_pawn(self):
-        return self in [Piece.WHITE_PAWN, Piece.BLACK_PAWN]
+        return self.value % 4 == 1
 
     def is_rook(self):
-        return self in [Piece.WHITE_ROOK, Piece.BLACK_ROOK]
+        return self.value % 4 == 2
 
     def is_knight(self):
-        return self in [Piece.WHITE_KNIGHT, Piece.BLACK_KNIGHT]
+        return self.value % 4 == 3
 
     def is_bishop(self):
-        return self in [Piece.WHITE_BISHOP, Piece.BLACK_BISHOP]
+        return self.value % 4 == 0 and self.value != 0
 
 
 class Move:
@@ -176,13 +148,13 @@ class Game:
                         Move(start_x=x, start_y=y, piece=placement_pawn)
                     )
 
-                if piece in [Piece.WHITE_PAWN, Piece.BLACK_PAWN]:
+                if piece.is_pawn():
                     allowed_moves.extend(self.pawn_movements(x, y))
-                if piece in [Piece.WHITE_KNIGHT, Piece.BLACK_KNIGHT]:
+                if piece.is_knight():
                     allowed_moves.extend(self.knight_movements(x, y))
-                if piece in [Piece.WHITE_BISHOP, Piece.BLACK_BISHOP]:
+                if piece.is_bishop():
                     allowed_moves.extend(self.bischop_movement(x, y))
-                if piece in [Piece.WHITE_ROOK, Piece.BLACK_ROOK]:
+                if piece.is_rook():
                     allowed_moves.extend(self.rook_movement(x, y))
 
         # Filter out moves that would put you in check
